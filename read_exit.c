@@ -38,7 +38,7 @@ typedef struct{
 //pages are fied blocks of memory where rows are stored 
 typedef enum{
   STATEMENT_INSERT,
-  STATEMENT_SELECT
+  STATEMENT_SELECT,
 }StatementType;
 typedef struct{
   StatementType type;
@@ -113,7 +113,7 @@ MetaCommandResult do_meta_command(InputBuffer* input_buffer){
 }
 
 PrepareResult prepare_statement(InputBuffer* input_buffer,Statement* statement ){
-  if(strcmp( input_buffer->buffer, "insert") == 0){
+  if(strncmp(input_buffer->buffer, "insert", 6) == 0){
     statement->type = STATEMENT_INSERT;
     int args_assignment = sscanf(input_buffer->buffer, "insert %d %s %s", &(statement->row_to_insert.id),statement->row_to_insert.username, statement->row_to_insert.email);
     if(args_assignment<3){
