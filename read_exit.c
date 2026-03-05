@@ -33,7 +33,7 @@ const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
 
 typedef struct{
   uint32_t num_rows;
-  void* pages[TABLE_MAX_PAGES];
+  Pager* pages[TABLE_MAX_PAGES];
 }Table;
 //pages are fied blocks of memory where rows are stored 
 typedef enum{
@@ -44,6 +44,11 @@ typedef struct{
   StatementType type;
   Row row_to_insert;
 }Statement;
+typedef struct{
+  int file_desc;
+  uint32_t file_lenght;
+  void* pages[TABLE_MAX_PAGES];
+}Pager;
 typedef enum{EXECUTE_SUCCESS, EXECUTE_TABLE_FULL}ExecutResult;
 typedef enum {PREPARE_SUCCESS, PREPARE_UNRECOGNIZED_STATEMENT,PREPARE_SYNTAX_ERROR, PREPARE_STRING_TOO_LONG, PREPARE_ID_NEGETIVE} PrepareResult;
 typedef struct{
