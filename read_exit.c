@@ -14,8 +14,8 @@ typedef enum{
 }MetaCommandResult;
 typedef struct{
   uint32_t id;
-  char username[COLUMN_USERNAME_LENGTH];
-  char email[COLUMN_EMAIL_LENGTH];
+  char username[COLUMN_USERNAME_LENGTH +1];
+  char email[COLUMN_EMAIL_LENGTH+1];
 }Row;
 
 const uint32_t ID_SIZE = size_of_attribute(Row, id);
@@ -45,7 +45,7 @@ typedef struct{
   Row row_to_insert;
 }Statement;
 typedef enum{EXECUTE_SUCCESS, EXECUTE_TABLE_FULL}ExecutResult;
-typedef enum {PREPARE_SUCCESS, PREPARE_UNRECOGNIZED_STATEMENT,PREPARE_SYNTAX_ERROR} PrepareResult;
+typedef enum {PREPARE_SUCCESS, PREPARE_UNRECOGNIZED_STATEMENT,PREPARE_SYNTAX_ERROR, PREPARE_STRING_TOO_LONG, PREPARE_ID_NEGETIVE} PrepareResult;
 typedef struct{
   char* buffer;
   size_t buffer_length;
@@ -112,20 +112,42 @@ MetaCommandResult do_meta_command(InputBuffer* input_buffer){
   }
 }
 
-PrepareResult prepare_statement(InputBuffer* input_buffer,Statement* statement ){
+PrepareResult prepare_insert(InputBuffer* input_buffer,Statement* statement ){
   if(strncmp(input_buffer->buffer, "insert", 6) == 0){
     statement->type = STATEMENT_INSERT;
-    int args_assignment = sscanf(input_buffer->buffer, "insert %d %s %s", &(statement->row_to_insert.id),statement->row_to_insert.username, statement->row_to_insert.email);
-    if(args_assignment<3){
+    char* keywork = strtok(input_buffer->buffer, " ");
+    char* id_string = strtok(NULL, " ");
+    char* username = strtok(NULL, " ");
+    char* email = strtok(NULL, " ");
+    if(id_string == NULL || username == NULL || email == NULL){
       return PREPARE_SYNTAX_ERROR;
     }
-    return PREPARE_SUCCESS;
-  }
-  if(strcmp(input_buffer->buffer, "select") == 0){
-    statement->type = STATEMENT_SELECT;
+    int id = atoi(id_string);
+    if(id<0){
+      return PREPARE_ID_NEGETIVE;
+    }
+    if(strlen(username) > COLUMN_USERNAME_LENGTH){
+      return PREPARE_STRING_TOO_LONG;
+    }
+    if(strlen(email) > COLUMN_EMAIL_LENGTH){
+      return PREPARE_STRING_TOO_LONG;
+
+    }
+    statement->row_to_insert.id = id;
+    strcpy(statement->row_to_insert.username, username);
+    strcpy(statement->row_to_insert.email, email);
     return PREPARE_SUCCESS;
   }
   return PREPARE_UNRECOGNIZED_STATEMENT;
+}
+PrepareResult prepare_statement(InputBuffer* input_buffer, Statement* statement){
+  if(strncmp(input_buffer->buffer, "insert", 6) == 0){
+    return prepare_insert(input_buffer, statement);
+  }
+  if(strncmp(input_buffer->buffer, "select", 6) == 0){
+    statement->type = STATEMENT_SELECT;
+    return PREPARE_SUCCESS;
+  }
 }
 Table* new_table(){
   Table* table = (Table*)malloc(sizeof(Table));
@@ -198,6 +220,12 @@ int main(int argc, char* argv[]){
         continue;
       case (PREPARE_SYNTAX_ERROR):
       printf("Synteax error \n");
+      continue;
+      case (PREPARE_STRING_TOO_LONG):
+      printf("Too lonf of a string mate");
+      continue;
+        case (PREPARE_ID_NEGETIVE):
+      printf("ID cannot be negetive");
       continue;
       }
     switch(execute_Statement(&statement, table)){
