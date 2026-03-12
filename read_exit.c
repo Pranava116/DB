@@ -5,6 +5,7 @@
 #include<stdlib.h>
 #include<string.h>
 #include<stdint.h>
+#include<stdbool.h>
 #define COLUMN_USERNAME_LENGTH 32
 #define COLUMN_EMAIL_LENGTH 255
 #define size_of_attribute(Struct, Attribute) sizeof(((Struct*)0) -> Attribute)
@@ -28,7 +29,7 @@ const uint32_t ID_OFFSET = 0;
 //in disk we dont seperate and store the valaues of id, username, email instead we store raw bytes and to know when the next values stat we use offsets
 const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
 const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
-const uint32_t ROW_SIZE = ID_OFFSET+USERNAME_OFFSET+EMAIL_OFFSET;
+const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
 const uint32_t PAGE_SIZE = 4096;
 
 const uint32_t ROWS_PER_PAGE = PAGE_SIZE/ROW_SIZE;
@@ -194,8 +195,7 @@ MetaCommandResult do_meta_command(InputBuffer* input_buffer, Table* table){
 PrepareResult prepare_insert(InputBuffer* input_buffer,Statement* statement ){
   if(strncmp(input_buffer->buffer, "insert", 6) == 0){
     statement->type = STATEMENT_INSERT;
-    char* keywork = strtok(input_buffer->buffer, " ");
-    char* id_string = strtok(NULL, " ");
+    char* id_string = strtok(input_buffer->buffer, " ");
     char* username = strtok(NULL, " ");
     char* email = strtok(NULL, " ");
     if(id_string == NULL || username == NULL || email == NULL){
@@ -227,6 +227,7 @@ PrepareResult prepare_statement(InputBuffer* input_buffer, Statement* statement)
     statement->type = STATEMENT_SELECT;
     return PREPARE_SUCCESS;
   }
+  return PREPARE_UNRECOGNIZED_STATEMENT;
 }
 Pager* pager_open_file(const char* filename){
     int fd = open(filename, O_RDWR|O_CREAT, S_IWUSR|S_IRUSR );
@@ -249,16 +250,14 @@ Table* db_open(const char* filename){
   Table* table = (Table*)malloc(sizeof(Table));
   table->pager =  pager;
   table->num_rows = num_rows;
-  for(uint32_t i =0;i<TABLE_MAX_PAGES; i++){
-    table->pager[i] = NULL;
-  }
   return table;
 }
-void* free_table(Table* table){
-  for(int i = 0;i<table->pager[i]; i++){
-    free(table->pager[i]);
-    free(table);
+void free_table(Table* table){
+  for(int i = 0;i<TABLE_MAX_PAGES; i++){
+    free(table->pager->pages[i]);
   }
+  free(table->pager);
+  free(table);
 }
 ExecutResult execute_insert(Statement* statement, Table* table){
   if(table->num_rows >= TABLE_MAX_ROWS){
@@ -269,10 +268,10 @@ ExecutResult execute_insert(Statement* statement, Table* table){
   table->num_rows++;
   return EXECUTE_SUCCESS;
 }
-void* print_row(Row* row){
+void print_row(Row* row){
   printf("(%d, %s, %s) \n", row->id, row->username, row->email);
 }
-ExecutResult execute_select(Statement* staatement, Table* table){
+ExecutResult execute_select(Table* table){
   Row row;
   for(uint32_t i = 0;i<table->num_rows; i++){
     deserialize_values(row_slot(table, i), &row);
@@ -285,13 +284,14 @@ ExecutResult execute_Statement(Statement* statement, Table* table){
   switch(statement->type){
     case (STATEMENT_SELECT):
     printf("This is an select statement");
-      return execute_select(statement, table);
+      return execute_select(table);
     break;
     case (STATEMENT_INSERT):
     printf("This is a insert statement");
       return execute_insert(statement, table);
     break;
   }
+  return EXECUTE_SUCCESS;
 }
 int main(int argc, char* argv[]){
   InputBuffer* input_buffer = new_input_buffer();
