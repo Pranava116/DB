@@ -324,10 +324,10 @@ int main(int argc, char* argv[]){
       printf("Synteax error \n");
       continue;
       case (PREPARE_STRING_TOO_LONG):
-      printf("Too lonf of a string mate");
+      printf("Too long of a string mate \n");
       continue;
         case (PREPARE_ID_NEGETIVE):
-      printf("ID cannot be negetive");
+      printf("ID cannot be negetive \n");
       continue;
       }
     switch(execute_Statement(&statement, table)){
