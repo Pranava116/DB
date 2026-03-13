@@ -68,18 +68,16 @@ InputBuffer* new_input_buffer(){
   return  input_buffer;
 }
 
-
-void serialize_values(Row* source, void* destination){
-  memcpy(destination + ID_OFFSET, &(source->id), ID_SIZE);
-  memcpy(destination +USERNAME_OFFSET, &(source->username), USERNAME_SIZE);
-  memcpy(destination + EMAIL_OFFSET, &(source->email), EMAIL_SIZE);
+void deserialize_values(void* source, Row* destination){
+  memcpy(&(destination->id), (char*)source + ID_OFFSET, ID_SIZE);
+  memcpy(destination->username, (char*)source + USERNAME_OFFSET, USERNAME_SIZE);
+  memcpy(destination->email, (char*)source + EMAIL_OFFSET, EMAIL_SIZE);
 }
 // so what er do is we take ths tructed data like struct and convert them to raw bytes to store in memory that is why the desitnation type is void
-//
-void deserialize_values(void* source, Row* destination){
-  memcpy(&(destination->id), source+ID_OFFSET, ID_SIZE);
-  memcpy(&(destination->username), source+USERNAME_OFFSET, USERNAME_SIZE);
-  memcpy(&(destination->email), source+EMAIL_OFFSET, EMAIL_SIZE);
+void serialize_values(Row* source, void* destination){
+  memcpy((char*)destination + ID_OFFSET, &(source->id), ID_SIZE);
+  memcpy((char*)destination + USERNAME_OFFSET, source->username, USERNAME_SIZE);
+  memcpy((char*)destination + EMAIL_OFFSET, source->email, EMAIL_SIZE);
 }
 void* get_page(Pager* pager, uint32_t page_num){
         if(page_num >TABLE_MAX_PAGES){
@@ -111,7 +109,7 @@ void* row_slot(Table* table, uint32_t row_num){
   void* page = get_page(table->pager, page_num);
   uint32_t row_offset = row_num%ROWS_PER_PAGE;
   uint32_t byte_offset = row_offset * ROW_SIZE;
-  return page + byte_offset;
+  return (char*) page + byte_offset;
 }
 void printf_prompt(){
   printf("db > ");
@@ -195,7 +193,8 @@ MetaCommandResult do_meta_command(InputBuffer* input_buffer, Table* table){
 PrepareResult prepare_insert(InputBuffer* input_buffer,Statement* statement ){
   if(strncmp(input_buffer->buffer, "insert", 6) == 0){
     statement->type = STATEMENT_INSERT;
-    char* id_string = strtok(input_buffer->buffer, " ");
+    char* keyword = strtok(input_buffer->buffer, " ");
+    char* id_string = strtok(NULL, " ");
     char* username = strtok(NULL, " ");
     char* email = strtok(NULL, " ");
     if(id_string == NULL || username == NULL || email == NULL){
