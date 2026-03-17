@@ -12,6 +12,7 @@
 #define TABLE_MAX_PAGES 100
 
 //the above line is a macro that gives the size of the attribute in the struct
+typedef enum{NODE_INTERNAL, NODE_LEAF}NODE_TYPE;
 typedef enum{
   META_COMMAND_SUCCESS,
   META_COMMAND_UNRECOGNIZED
@@ -35,7 +36,13 @@ typedef struct{
   uint32_t row_num;
   bool end_of_page;
 }Cursor;
-
+const uint32_t NODE_TYPE_SIZE = sizeof(uint8_t);
+const uint32_t NODE_TYPE_OFFSET = 0;
+const uint32_t  IS_ROOT_SIZE = sizeof(uint8_t);
+const uint32_t IS_ROOT_OFFSET = NODE_TYPE_SIZE;
+const uint32_t PARENT_POINTER_SIZE = sizeof(uint32_t);
+const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
+const uint8_t COMMON_NODE_HEADER_SIZE = NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_SIZE;
 const uint32_t ID_SIZE = size_of_attribute(Row, id);
 const uint32_t USERNAME_SIZE = size_of_attribute(Row, username);
 const uint32_t EMAIL_SIZE = size_of_attribute(Row, email);
