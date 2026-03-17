@@ -72,6 +72,21 @@ typedef struct{
   size_t input_length;
 }InputBuffer;
 //used to allcate memory to the user input
+uint32_t* leaf_node_num_cells(void* node){
+  return node + LEAF_NODE_NUM_CELLS_OFFSET
+}
+void* leaf_node_cell(void* node, uint32_t cell_num){
+  return node +LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
+}
+uint32_t* leaf_node_key(void* nodem uint32_t cell_num){
+  return leaf_node_cell(node, cell_num);
+}
+void* leaf_node_value(void* node, uint32_t cell_num){
+  return leaf_node_cell(node, cell_num) + LEAF_NODE_KEY_SIZE;
+}
+void initialize_leaf_node(void* node) {
+  *leaf_node_num_cells(node) = 0;
+}
 InputBuffer* new_input_buffer(){
   InputBuffer* input_buffer = (InputBuffer*)malloc(sizeof(InputBuffer));
   input_buffer->buffer = NULL;
@@ -162,7 +177,7 @@ void close_input_buffer(InputBuffer* input_buffer){
   free(input_buffer->buffer);
   free(input_buffer);
 }
-void pager_flush(Pager* pager, uint32_t page_num, uint32_t size){
+void pager_flush(Pager* pager, uint32_t page_num ){
     if(pager->pages[page_num] == NULL){
         printf("Tried to flush null page");
         exit(EXIT_FAILURE);
@@ -173,7 +188,7 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size){
         exit(EXIT_FAILURE);
 
     }
-    ssize_t bytes_written = write(pager->file_desc, pager->pages[page_num], size);
+    ssize_t bytes_written = write(pager->file_desc, pager->pages[page_num], PAGE_SIZE);
     if(bytes_written == -1){
         printf("Error writing \n");
         exit(EXIT_FAILURE);
@@ -182,11 +197,11 @@ void pager_flush(Pager* pager, uint32_t page_num, uint32_t size){
 void db_close(Table* table){
     Pager* pager = table->pager;
     uint32_t num_full_pages = table->num_rows/ROWS_PER_PAGE;
-    for(uint32_t i =0;i<num_full_pages;i++){
+    for(uint32_t i =0;i<pager->num_pages;i++){
         if(pager->pages[i] == NULL){
             continue;
         }
-        pager_flush(pager, i, PAGE_SIZE);
+        pager_flush(pager, i);
         free(pager->pages[i]);
         pager->pages[i] = NULL;
     }
