@@ -55,6 +55,19 @@ const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
 const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
 const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
 const uint32_t PAGE_SIZE = 4096;
+const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
+const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = COMMON_NODE_HEADER_SIZE;
+const uint32_t LEAF_NODE_HEADER_SIZE =
+    COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
+const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
+const uint32_t LEAF_NODE_KEY_OFFSET = 0;
+const uint32_t LEAF_NODE_VALUE_SIZE = ROW_SIZE;
+const uint32_t LEAF_NODE_VALUE_OFFSET =
+    LEAF_NODE_KEY_OFFSET + LEAF_NODE_KEY_SIZE;
+const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
+const uint32_t LEAF_NODE_SPACE_FOR_CELLS = PAGE_SIZE - LEAF_NODE_HEADER_SIZE;
+const uint32_t LEAF_NODE_MAX_CELLS =
+    LEAF_NODE_SPACE_FOR_CELLS / LEAF_NODE_CELL_SIZE;
 
 //pages are fied blocks of memory where rows are stored
 typedef enum{
@@ -74,12 +87,12 @@ typedef struct{
 }InputBuffer;
 //used to allcate memory to the user input
 uint32_t* leaf_node_num_cells(void* node){
-  return node + LEAF_NODE_NUM_CELLS_OFFSET
-}
+  return node + LEAF_NODE_NUM_CELLS_OFFSET;
+};
 void* leaf_node_cell(void* node, uint32_t cell_num){
   return node +LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
 }
-uint32_t* leaf_node_key(void* nodem uint32_t cell_num){
+uint32_t* leaf_node_key(void* node, uint32_t cell_num){
   return leaf_node_cell(node, cell_num);
 }
 void* leaf_node_value(void* node, uint32_t cell_num){
@@ -94,39 +107,6 @@ InputBuffer* new_input_buffer(){
   input_buffer->buffer_length = 0;
   input_buffer->input_length = 0;
   return  input_buffer;
-}
-Cursor* table_start(Table* table ){
-  Cursor* cursor = malloc(sizeof(Cursor));
-  cursor->table = table;
-  cursor->page_num = table->root_page_num;
-  cursor->cell_num = 0;
-  void* root_node = get_page(table->pager, table->root_page_num);
-  uint32_t num_cells = *leaf_node_cells(root_node);
-  cursor->end_of_page = (num_cells = 0); 
-  return cursor;
-}
-Cursor* table_end(Table* table ){
-  Cursor* cursor= malloc(sizeof(Cursor));
-  cursor->table = table;
-  cursor->page_num = table->root_page_num;
-
-  void* root_node = get_page(table->pager, table->root_page_num);
-  uint32_t num_cells = *leaf_node_num_cells(root_node);
-  cursor->cell_num = num_cells;
-  cursor->end_of_page = true;
-  return cursor;
-}
-
-void deserialize_values(void* source, Row* destination){
-  memcpy(&(destination->id), (char*)source + ID_OFFSET, ID_SIZE);
-  memcpy(destination->username, (char*)source + USERNAME_OFFSET, USERNAME_SIZE);
-  memcpy(destination->email, (char*)source + EMAIL_OFFSET, EMAIL_SIZE);
-}
-// so what er do is we take ths tructed data like struct and convert them to raw bytes to store in memory that is why the desitnation type is void
-void serialize_values(Row* source, void* destination){
-  memcpy((char*)destination + ID_OFFSET, &(source->id), ID_SIZE);
-  memcpy((char*)destination + USERNAME_OFFSET, source->username, USERNAME_SIZE);
-  memcpy((char*)destination + EMAIL_OFFSET, source->email, EMAIL_SIZE);
 }
 void* get_page(Pager* pager, uint32_t page_num){
         if(page_num >TABLE_MAX_PAGES){
@@ -156,11 +136,45 @@ void* get_page(Pager* pager, uint32_t page_num){
 
         }
 
+
+Cursor* table_start(Table* table ){
+  Cursor* cursor = malloc(sizeof(Cursor));
+  cursor->table = table;
+  cursor->page_num = table->root_page_num;
+  cursor->cell_num = 0;
+  void* root_node = get_page(table->pager, table->root_page_num);
+  uint32_t num_cells = *leaf_node_num_cells(root_node);
+  cursor->end_of_page = (num_cells = 0); 
+  return cursor;
+}
+Cursor* table_end(Table* table ){
+  Cursor* cursor= malloc(sizeof(Cursor));
+  cursor->table = table;
+  cursor->page_num = table->root_page_num;
+
+  void* root_node = get_page(table->pager, table->root_page_num);
+  uint32_t num_cells = *leaf_node_num_cells(root_node);
+  cursor->cell_num = num_cells;
+  cursor->end_of_page = true;
+  return cursor;
+}
+
+void deserialize_values(void* source, Row* destination){
+  memcpy(&(destination->id), (char*)source + ID_OFFSET, ID_SIZE);
+  memcpy(destination->username, (char*)source + USERNAME_OFFSET, USERNAME_SIZE);
+  memcpy(destination->email, (char*)source + EMAIL_OFFSET, EMAIL_SIZE);
+}
+// so what er do is we take ths tructed data like struct and convert them to raw bytes to store in memory that is why the desitnation type is void
+void serialize_values(Row* source, void* destination){
+  memcpy((char*)destination + ID_OFFSET, &(source->id), ID_SIZE);
+  memcpy((char*)destination + USERNAME_OFFSET, source->username, USERNAME_SIZE);
+  memcpy((char*)destination + EMAIL_OFFSET, source->email, EMAIL_SIZE);
+}
 void* cursor_adv(Cursor* cursor){
   uint32_t page_num = cursor->page_num;
   void* node = get_page(cursor->table->pager, page_num);
   cursor->cell_num++;
-  if(cursor->cell_num >= (leaf_node_num_cells(node))){
+  if(cursor->cell_num >= (*leaf_node_num_cells(node))){
     cursor->end_of_page = true;
   }
 }
@@ -206,7 +220,6 @@ void pager_flush(Pager* pager, uint32_t page_num ){
 }
 void db_close(Table* table){
     Pager* pager = table->pager;
-    uint32_t num_full_pages = table->num_rows/ROWS_PER_PAGE;
     for(uint32_t i =0;i<pager->num_pages;i++){
         if(pager->pages[i] == NULL){
             continue;
@@ -299,11 +312,30 @@ Pager* pager_open_file(const char* filename){
 }
 Table* db_open(const char* filename){
     Pager* pager = pager_open_file(filename);
-    uint32_t num_rows = pager->file_length /ROW_SIZE;
   Table* table = (Table*)malloc(sizeof(Table));
   table->pager =  pager;
-  table->num_rows = num_rows;
+  table->root_page_num = 0;
+  if(pager->num_pages = 0){
+    void* root_node = get_page(pager, 0);
+    initialize_leaf_node(root_node);
+  }
   return table;
+}
+void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value){
+  void* node = get_page(cursor->table->pager, cursor->page_num);
+  uint32_t num_cells = *leaf_node_num_cells(node);
+  if(num_cells>= LEAF_NODE_MAX_CELLS){
+    printf("need to implement splitting a leaf node \n");
+    exit(EXIT_FAILURE);
+  }
+  if(cursor->cell_num < num_cells){
+    for(uint32_t i = num_cells; i>cursor->cell_num; i--){
+      memcpy(leaf_node_cell(node, i), leaf_node_cell(node, i -1), LEAF_NODE_CELL_SIZE);
+    }
+  }
+  *(leaf_node_num_cells(node)) += 1;
+  *(leaf_node_key(node, cursor->cell_num)) = key;
+  serialize_values(value, leaf_node_value(node, cursor->cell_num));
 }
 void free_table(Table* table){
   for(int i = 0;i<TABLE_MAX_PAGES; i++){
@@ -313,13 +345,13 @@ void free_table(Table* table){
   free(table);
 }
 ExecutResult execute_insert(Statement* statement, Table* table){
-  if(table->num_rows >= TABLE_MAX_ROWS){
+  void* node = get_page(table->pager, table->root_page_num);
+  if((*leaf_node_num_cells(node) >= LEAF_NODE_MAX_CELLS)){
     return EXECUTE_TABLE_FULL;
   }
   Cursor* cursor = table_end(table);
   Row* row_to_insert = &(statement->row_to_insert);
-  serialize_values(row_to_insert, cursor_value(cursor));
-  table->num_rows++;
+  leaf_node_insert(cursor, row_to_insert->id, row_to_insert);
   return EXECUTE_SUCCESS;
 }
 void print_row(Row* row){
